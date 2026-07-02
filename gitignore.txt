@@ -1,0 +1,4 @@
+.DS_Store
+Scripts/
+DNB data private/
+.Rproj.user
