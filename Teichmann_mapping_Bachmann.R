@@ -17,6 +17,11 @@ onb_bachmann <- read.csv("~/Mapping-Bachmann/data/Excel_20260702_103219.csv", se
 
 ##clean year
 onb_bachmann <- onb_bachmann %>% mutate(Jahr.Datierung = str_extract(Jahr.Datierung, "\\b\\d{4}\\b"))
+onb_bachmann <- onb_bachmann %>% filter(Jahr.Datierung != 1381 | is.na(Jahr.Datierung))
+
+##only translations
+onb_bachmann_trans <- onb_bachmann %>% filter(!str_detect(Sprache, regex("^Deutsch$", ignore_case = TRUE)))
+
 ##title frequencies per year
 onb_bachmann_year <- as.data.frame(table(onb_bachmann$Jahr.Datierung))
 onb_bachmann_year = onb_bachmann_year[-1,]
@@ -71,7 +76,7 @@ onb_bachmann_langs %>%
   geom_text(aes(label = paste0(Freq, " (", round(perc,1), "%)")),
             hjust = -0.1, size = 3) +
   coord_flip() +
-  labs(x = "Language", y = "Frequency (titles)", title = "Language frequencies (excluding Deutsch)") +
+  labs(x = "Language", y = "Frequency (titles)", title = "N of titles per language (excluding German)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
@@ -79,15 +84,32 @@ ggsave("figures/020726_onb_bachmann_language_trans_freqs.png", width = 6, height
 
 ##create timeline for languges/year
 
+#ggplot(onb_bachmann, aes(x = Jahr.Datierung, y = Sprache)) + geom_point(alpha = 0.6, position = position_jitter(height = 0.2, width = 0)) + labs(x = "Year", y = "Language", title = "Titles over time by language") + theme_minimal()
 
+#ggplot(onb_bachmann, aes(x = Jahr.Datierung, y = 0)) + geom_point(alpha = 0.6, position = position_jitter(height = 0.08)) + geom_rug(sides = "b", alpha = 0.3) + scale_y_continuous(NULL, breaks = NULL) + labs(x = "Year", y = NULL, title = "Titles over time") + theme_minimal()+
+#  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
+lang_year <- onb_bachmann %>% filter(!str_detect(Sprache, regex("^Deutsch$", ignore_case = TRUE))) %>% rename(language = Sprache) %>% mutate(language = as.character(language)) %>% group_by(Jahr.Datierung, language) %>% summarise(count = n(), .groups = "drop") %>%
+  mutate(language = case_when(
+    is.na(language) ~ NA_character_,
+    str_detect(language, "[,;/|]") ~ "multilingual",
+    TRUE ~ language
+  )) %>% filter(!is.na(language) & str_squish(language) != "")
+lang_year$Jahr.Datierung <- as.numeric(lang_year$Jahr.Datierung)
+lang_order <- lang_year %>% group_by(language) %>% summarise(total = sum(count, na.rm = TRUE), .groups = "drop") %>% arrange(desc(total)) %>% pull(language)
 
+#Plot
+lang_year %>% mutate(language = factor(language, levels = lang_order)) %>% ggplot(aes(x = Jahr.Datierung, y = language, fill = count)) + geom_tile(color = "white") + scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) + scale_fill_viridis_c(option = "C", direction = -1) + labs(x = "Year", y = "Language", fill = "Titles", title = "Translated titles per year (heatmap)") + theme_minimal()
 
+ggsave("figures/020726_onb_bachmann_language_trans_freqs_peryear.png", width = 6, height = 4, dpi=300)
 
+##Most translated titles
+View(table(onb_bachmann_trans$Werktitel))
 
+##Find out original titles for translations with automatic translation
+library(polyglotr)
 
-
-
+translation_google <- google_translate(text, target_language = "fr", source_language = "en")
 
 
 
